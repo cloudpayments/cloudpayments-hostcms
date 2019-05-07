@@ -22,6 +22,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
                                                 5 — Патентная система налогообложения */
     private $_cp_calculationPlace = "www.my.ru"; //место осуществления расчёта, по умолчанию берется значение из кассы
 	
+    private $_cp_default_skin = "classic"; // Выбор дизайна виджета. Возможные варианты: "classic", "modern", "mini"
+	
     /* Конец блока настроек модуля оплаты CloudPayments */
     
     function __construct(\Shop_Payment_System_Model $oShop_Payment_System_Model) {
@@ -161,6 +163,7 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
             'invoiceId' => $this->_shopOrder->invoice,
             'accountId' => (isset($this->_shopOrder->email) ? $this->_shopOrder->email : (isset($this->_shopOrder->phone) ? $this->_shopOrder->phone : $this->_shopOrder->id)),
             'data' => $request_data,
+	    'skin' => $this->_cp_default_skin,
         );
 
         $form = "<script src=\"https://widget.cloudpayments.ru/bundles/cloudpayments\"></script>
@@ -172,7 +175,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
                             amount: " . $fields["amount"] . ",
                             currency: '" . $fields["currency"] . "',
                             invoiceId: '" . $fields["invoiceId"] . "', 
-                            accountId: '" . $fields["accountId"] . "',  
+                            accountId: '" . $fields["accountId"] . "', 
+			    skin: '" . $fields["skin"] . "',
                             data: " . $fields["data"] . "  
                         },
 			        function (options) { // success
