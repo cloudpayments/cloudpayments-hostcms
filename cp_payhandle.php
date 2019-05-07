@@ -11,8 +11,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
     // Блок настроек онлайн-кассы (ФЗ-54), подробная информация на https://cloudpayments.ru/docs/api/kassa
     private $_cp_onlinekassa_enabled = false; // Включить отправку чеков (true - да, false - нет)
     
-    private $_cp_onlinekassa_taxtype = 10; /* 18 - НДС 18%, 10 - НДС 10%, null - НДС не облагается, 0 - НДС 0%, 
-                                            * 110 — расчетный НДС 10/110, 118 — расчетный НДС 18/118 */
+    private $_cp_onlinekassa_taxtype = 10; /* 20 - НДС 20%, 10 - НДС 10%, null - НДС не облагается, 0 - НДС 0%, 
+                                            * 110 — расчетный НДС 10/110, 120 — расчетный НДС 20/120 */
     
     private $_cp_onlinekassa_taxsystem = 0; /* 0 — Общая система налогообложения
                                                 1 — Упрощенная система налогообложения (Доход)
@@ -20,6 +20,10 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
                                                 3 — Единый налог на вмененный доход
                                                 4 — Единый сельскохозяйственный налог
                                                 5 — Патентная система налогообложения */
+    private $_cp_calculationPlace = "www.my.ru"; //место осуществления расчёта, по умолчанию берется значение из кассы
+	
+    private $_cp_default_skin = "classic"; // Выбор дизайна виджета. Возможные варианты: "classic", "modern", "mini"
+	
     /* Конец блока настроек модуля оплаты CloudPayments */
     
     function __construct(\Shop_Payment_System_Model $oShop_Payment_System_Model) {
@@ -113,6 +117,7 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
             $aShopOrderItems = $oShop_Order->Shop_Order_Items->findAll();
             $receipt = array("cloudPayments"=>array("customerReceipt"=>array(
                 'Items' => array(),
+		'calculationPlace' => $this->_cp_calculationPlace,
                 'taxationSystem' => 0,
                 'email' => $this->_shopOrder->email,
                 'phone' => $this->_shopOrder->phone
@@ -158,6 +163,7 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
             'invoiceId' => $this->_shopOrder->invoice,
             'accountId' => (isset($this->_shopOrder->email) ? $this->_shopOrder->email : (isset($this->_shopOrder->phone) ? $this->_shopOrder->phone : $this->_shopOrder->id)),
             'data' => $request_data,
+	    'skin' => $this->_cp_default_skin,
         );
 
         $form = "<script src=\"https://widget.cloudpayments.ru/bundles/cloudpayments\"></script>
@@ -169,7 +175,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
                             amount: " . $fields["amount"] . ",
                             currency: '" . $fields["currency"] . "',
                             invoiceId: '" . $fields["invoiceId"] . "', 
-                            accountId: '" . $fields["accountId"] . "',  
+                            accountId: '" . $fields["accountId"] . "', 
+			    skin: '" . $fields["skin"] . "',
                             data: " . $fields["data"] . "  
                         },
 			        function (options) { // success
