@@ -11,8 +11,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
     // Блок настроек онлайн-кассы (ФЗ-54), подробная информация на https://cloudpayments.ru/docs/api/kassa
     private $_cp_onlinekassa_enabled = false; // Включить отправку чеков (true - да, false - нет)
     
-    private $_cp_onlinekassa_taxtype = 10; /* 18 - НДС 18%, 10 - НДС 10%, null - НДС не облагается, 0 - НДС 0%, 
-                                            * 110 — расчетный НДС 10/110, 118 — расчетный НДС 18/118 */
+    private $_cp_onlinekassa_taxtype = 10; /* 20 - НДС 20%, 10 - НДС 10%, null - НДС не облагается, 0 - НДС 0%, 
+                                            * 110 — расчетный НДС 10/110, 120 — расчетный НДС 20/120 */
     
     private $_cp_onlinekassa_taxsystem = 0; /* 0 — Общая система налогообложения
                                                 1 — Упрощенная система налогообложения (Доход)
