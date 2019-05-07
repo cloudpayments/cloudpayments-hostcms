@@ -20,6 +20,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
                                                 3 — Единый налог на вмененный доход
                                                 4 — Единый сельскохозяйственный налог
                                                 5 — Патентная система налогообложения */
+    private $_cp_calculationPlace = "www.my.ru"; //место осуществления расчёта, по умолчанию берется значение из кассы
+	
     /* Конец блока настроек модуля оплаты CloudPayments */
     
     function __construct(\Shop_Payment_System_Model $oShop_Payment_System_Model) {
@@ -113,6 +115,7 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
             $aShopOrderItems = $oShop_Order->Shop_Order_Items->findAll();
             $receipt = array("cloudPayments"=>array("customerReceipt"=>array(
                 'Items' => array(),
+		'calculationPlace' => $this->_cp_calculationPlace,
                 'taxationSystem' => 0,
                 'email' => $this->_shopOrder->email,
                 'phone' => $this->_shopOrder->phone
