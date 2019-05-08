@@ -64,4 +64,4 @@
 
 е) в личном кабинете CloudPayments необходимо указать адрес для отправки уведомлений как - "**http://<адрес сайта.ru>/shop/cart/**".
 
-![Скрин 4](http://i.imgur.com/4FISgDn.png)
+![Скрин 4](https://imgur.com/jlAZuur)
