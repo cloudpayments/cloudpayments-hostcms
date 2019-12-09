@@ -7,12 +7,15 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
     private $_cp_public_id = '<ЗАПОЛНИТЕ ЭТИ ДАННЫЕ>'; // Public ID сайта
     private $_cp_api_pass = '<ЗАПОЛНИТЕ ЭТИ ДАННЫЕ>'; // Пароль для API сайта
     private $_cp_default_currency = "RUB"; // Валюта платежей
+    private $_cp_skin = "classic"; //дизайн виджета возможные значения - classic, modern, mini 
+    private $_cp_payment_scheme = "auth"; //схема проведения платежа возможные значения на https://developers.cloudpayments.ru/#shemy-provedeniya-platezha и https://developers.cloudpayments.ru/#parametry
+    private $_cp_language = "ru-RU"; // локализация виджета возможные значения на https://developers.cloudpayments.ru/#lokalizatsiya-vidzheta
     
     // Блок настроек онлайн-кассы (ФЗ-54), подробная информация на https://cloudpayments.ru/docs/api/kassa
-    private $_cp_onlinekassa_enabled = false; // Включить отправку чеков (true - да, false - нет)
+    private $_cp_onlinekassa_enabled = true; // Включить отправку чеков (true - да, false - нет)
     
-    private $_cp_onlinekassa_taxtype = 10; /* 18 - НДС 18%, 10 - НДС 10%, null - НДС не облагается, 0 - НДС 0%, 
-                                            * 110 — расчетный НДС 10/110, 118 — расчетный НДС 18/118 */
+    private $_cp_onlinekassa_taxtype = 20; /* 20 - НДС 20%, 10 - НДС 10%, null - НДС не облагается, 0 - НДС 0%, 
+                                            * 110 — расчетный НДС 10/110, 120 — расчетный НДС 20/120 */
     
     private $_cp_onlinekassa_taxsystem = 0; /* 0 — Общая система налогообложения
                                                 1 — Упрощенная система налогообложения (Доход)
@@ -75,23 +78,56 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
     function ProcessResult() {
         $headers = getallheaders();
         $request = file_get_contents('php://input');
-	$sign = hash_hmac('sha256', $request, $this->_cp_api_pass, true);
-	$hmac = base64_encode($sign);
-	if (!array_key_exists('Content-HMAC',$headers) && !array_key_exists('Content-Hmac',$headers) || (array_key_exists('Content-HMAC',$headers) && $headers['Content-HMAC'] != $hmac) || (array_key_exists('Content-Hmac',$headers) && $headers['Content-Hmac'] != $hmac)) {
+	    $sign = hash_hmac('sha256', $request, $this->_cp_api_pass, true);
+	    $hmac = base64_encode($sign);
+	    if (!array_key_exists('Content-HMAC',$headers) && !array_key_exists('Content-Hmac',$headers) || (array_key_exists('Content-HMAC',$headers) && $headers['Content-HMAC'] != $hmac) || (array_key_exists('Content-Hmac',$headers) && $headers['Content-Hmac'] != $hmac)) {
             die("hmac error");
-	}
+	    }
         
         if (!is_null($request)) {
             $oShop_Order = Core_Entity::factory('Shop_Order')->find($_POST["InvoiceId"]);
-
-            if (is_null($oShop_Order->id) || $oShop_Order->paid) {
+            
+            if ($_GET["action"] == 'refund') {
+                $this->shopOrder($oShop_Order)->shopOrderBeforeAction(clone $oShop_Order);
+                $note = $oShop_Order->system_information;
+                $oShop_Order->system_information =  $note."Возврат платежа через CloudPayments.\nТранзакция #".$_POST["TransactionId"]."\n";
+                $oShop_Order->canceled = 1;
+                $this->setXSLs();
+                $this->send();
+                $oShop_Order->save();
                 die;
             }
-
+            
+              if ($_GET["action"] == 'cancel') {
+                $this->shopOrder($oShop_Order)->shopOrderBeforeAction(clone $oShop_Order);
+                $note = $oShop_Order->system_information;
+                $oShop_Order->system_information =  $note."Отмена двухстадийного платежа через CloudPayments.\nТранзакция #".$_POST["TransactionId"]."\n";
+                $oShop_Order->canceled = 1;
+                $this->setXSLs();
+                $this->send();
+                $oShop_Order->save();
+                die;
+            }
+            
+            if (is_null($oShop_Order->id) || $oShop_Order->paid || $_GET["action"] == 'check') {
+                die;
+            }
+            
+            if ($_GET["action"] == 'pay' && $_POST["Status"] == 'Authorized') {
+                $this->shopOrder($oShop_Order)->shopOrderBeforeAction(clone $oShop_Order);
+                $note = $oShop_Order->system_information;
+                $oShop_Order->system_information =  $note."Платеж авторизован через CloudPayments.\nТранзакция #".$_POST["TransactionId"]."\n";
+                //$oShop_Order->paid();
+                $this->setXSLs();
+                $this->send();
+                $oShop_Order->save();
+                die;
+            }
+            
             if ($_POST["Amount"] == $oShop_Order->getAmount()) {
                 $this->shopOrder($oShop_Order)->shopOrderBeforeAction(clone $oShop_Order);
-
-                $oShop_Order->system_information = "Товар оплачен через CloudPayments.\nТранзакция #".$_POST["TransactionId"]."\n";
+                $note = $oShop_Order->system_information;
+                $oShop_Order->system_information = $note."Товар оплачен через CloudPayments.\nТранзакция #".$_POST["TransactionId"]."\n";
                 $oShop_Order->paid();
                 $this->setXSLs();
                 $this->send();
@@ -113,7 +149,8 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
             $aShopOrderItems = $oShop_Order->Shop_Order_Items->findAll();
             $receipt = array("cloudPayments"=>array("customerReceipt"=>array(
                 'Items' => array(),
-                'taxationSystem' => 0,
+                'taxationSystem' => $this->_cp_onlinekassa_taxsystem,
+		        'calculationPlace'=>'www.'.$_SERVER['SERVER_NAME'],
                 'email' => $this->_shopOrder->email,
                 'phone' => $this->_shopOrder->phone
             )));
@@ -148,25 +185,29 @@ class Shop_Payment_System_HandlerXX extends Shop_Payment_System_Handler {
                 }
             }
         }
-
+        
         $request_data = (($this->_cp_onlinekassa_enabled == 'yes') ? json_encode($receipt) : "{}");
         $fields = array(
-            'publicId' => $this->_cp_public_id,
-            'description' => "Оплата заказа #" . $this->_shopOrder->invoice,
-            'amount' => $this->_shopOrder->getAmount(),
-            'currency' => $this->_cp_default_currency,
-            'invoiceId' => $this->_shopOrder->invoice,
-            'accountId' => (isset($this->_shopOrder->email) ? $this->_shopOrder->email : (isset($this->_shopOrder->phone) ? $this->_shopOrder->phone : $this->_shopOrder->id)),
-            'data' => $request_data,
+            'publicId'      => $this->_cp_public_id,
+	        'payment_scheme'=> $this->_cp_payment_scheme,
+	        'language'      => $this->_cp_language,
+	        'skin'          => $this->_cp_skin,
+            'description'   => "Оплата заказа #" . $this->_shopOrder->invoice,
+            'amount'        => $this->_shopOrder->getAmount(),
+            'currency'      => $this->_cp_default_currency,
+            'invoiceId'     => $this->_shopOrder->invoice,
+            'accountId'     => (isset($this->_shopOrder->email) ? $this->_shopOrder->email : (isset($this->_shopOrder->phone) ? $this->_shopOrder->phone : $this->_shopOrder->id)),
+            'data'          => $request_data,
         );
 
-        $form = "<script src=\"https://widget.cloudpayments.ru/bundles/cloudpayments\"></script>
+        $form = "<script src=\"https://widget.cloudpayments.ru/bundles/cloudpayments?cms=HostCms\"></script>
 			<script>
-				var widget = new cp.CloudPayments();
-		    	widget.charge ({
+				var widget = new cp.CloudPayments({language:'" . $fields["language"] . "'});
+		    	widget." . $fields["payment_scheme"] . " ({
                             publicId: '" . $fields["publicId"] . "',
                             description: '" . $fields["description"] . "',
                             amount: " . $fields["amount"] . ",
+			                skin: '" . $fields["skin"] . "',
                             currency: '" . $fields["currency"] . "',
                             invoiceId: '" . $fields["invoiceId"] . "', 
                             accountId: '" . $fields["accountId"] . "',  
